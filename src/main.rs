@@ -41,11 +41,11 @@ fn main() -> Result<()> {
 
     let mut starting_neuron_ids = Vec::new();
 
-    let ids_limit = 10;
+    let ids_limit = 0;
     let ids_file = File::open("neuron_ids/gustatory/ids.txt")?;
     let ids_reader = BufReader::new(ids_file);
     for (i, id_line) in ids_reader.lines().enumerate() {
-        if i >= ids_limit {
+        if i >= ids_limit && (ids_limit != 0) {
             break;
         }
         let id = id_line?.parse::<i64>().unwrap();
@@ -59,7 +59,7 @@ fn main() -> Result<()> {
         0.01
     )?; 
 
-    let limit = 10;
+    let limit = 0;
     let epochs = 100;
 
     let mut propagated_neurons = Vec::new();
@@ -73,6 +73,12 @@ fn main() -> Result<()> {
         propagated_neurons = brain.propagate(&starting_neuron_ids, limit);
         learnt_neurons = brain.learn(&starting_neuron_ids, limit);
     }
+
+    let output = brain.get_output();
+    for (id, activity) in &output {
+        println!("Neuron ID: {id} Activity: {activity}");
+    }
+    println!("There are {} output neurons", output.len());
 
     let mut writer_propagated = csv::Writer::from_path("out_data/propagated.csv")?;
     writer_propagated.write_record(&["pre_root_id", "post_root_id", "activity"])?;
