@@ -148,6 +148,19 @@ impl Brain {
         }
     }
 
+    /// returns (neuron_id, activity)
+    pub fn get_output(&self) -> Vec<(i64, f32)> {
+        self.current_outputs
+            .iter()
+            .filter_map(|id| {
+                self.neurons.get(id).map(|neuron| {
+                    let neuron = neuron.lock().unwrap();
+                    (*id, neuron.activity)
+                })
+            })
+            .collect()
+    }
+
     pub fn search_neurons(
         &self,
         starting_neuron_ids: &[i64],
@@ -213,9 +226,24 @@ impl Brain {
     }
     
     /// returns (pre_root_id, post_root_id, activity)
-    pub fn propagate(&self, starting_neuron_ids: &[i64], limit: usize) -> Vec<(i64, i64, f32)> {
+    pub fn propagate(&mut self, starting_neuron_ids: &[i64], limit: usize) -> Vec<(i64, i64, f32)> {
         let mut affecteds = Vec::new();
         let root_ids = self.search_neurons(starting_neuron_ids, limit);
+
+        self.current_outputs = root_ids
+            .iter()
+            .copied()
+            .filter(|id| {
+                match self.coupling.get(id) {
+                    Some(conns) => {
+                        !conns
+                            .iter()
+                            .any(|conn| root_ids.contains(&conn.data.post_root_id))
+                    }
+                    None => true
+                }
+            })
+            .collect();
 
         let mut inputs = HashMap::new();
         for (_, post_root_id, activity) in &affecteds {
