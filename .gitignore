@@ -2,3 +2,7 @@
 .env
 connections.csv
 connections.rkyv
+out_data
+out_data/learnt.csv
+out_data/propagated.csv
+out_data/output_neurons.csv

@@ -36,21 +36,30 @@ fn _get_neuron_with_least_connections(conns: &[Connection], brain: &Brain) {
     println!("The neuron with the minimum connections is {}", min_neuron_id);
 }
 
+fn get_neuron_ids(path: &str) -> Result<Vec<i64>> {
+    let mut neuron_ids = Vec::new();
+
+    let ids_limit = 0;
+
+    let ids_file = File::open(path)?;
+    let ids_reader = BufReader::new(ids_file);
+
+    for (i, id_line) in ids_reader.lines().enumerate() {
+        if i >= ids_limit && ids_limit != 0 {
+            break;
+        }
+
+        let id = id_line?.parse::<i64>().unwrap();
+        neuron_ids.push(id);
+    }
+
+    Ok(neuron_ids)
+}
+
 fn main() -> Result<()> {
     let conns = Connections::new()?;
 
-    let mut starting_neuron_ids = Vec::new();
-
-    let ids_limit = 0;
-    let ids_file = File::open("neuron_ids/gustatory/ids.txt")?;
-    let ids_reader = BufReader::new(ids_file);
-    for (i, id_line) in ids_reader.lines().enumerate() {
-        if i >= ids_limit && (ids_limit != 0) {
-            break;
-        }
-        let id = id_line?.parse::<i64>().unwrap();
-        starting_neuron_ids.push(id);
-    }
+    let starting_neuron_ids = get_neuron_ids("neuron_ids/jo/da_ids.txt")?;
 
     let mut brain = Brain::new(
         starting_neuron_ids.clone(),
@@ -60,7 +69,7 @@ fn main() -> Result<()> {
     )?; 
 
     let limit = 0;
-    let epochs = 100;
+    let epochs = 10;
 
     let mut propagated_neurons = Vec::new();
     let mut learnt_neurons = Vec::new();
@@ -74,11 +83,19 @@ fn main() -> Result<()> {
         learnt_neurons = brain.learn(&starting_neuron_ids, limit);
     }
 
-    let output = brain.get_output();
-    for (id, activity) in &output {
-        println!("Neuron ID: {id} Activity: {activity}");
+    let (mut rl, thread) = raylib::init()
+        .size(600, 600)
+        .title("Fruit fly testing")
+        .build();
+
+    let mut fly = Fly::new(300.0, 300.0);
+    while !rl.window_should_close() {
+        let mut d = rl.begin_drawing(&thread);
+        d.clear_background(Color::BLACK);
+        
+        fly.draw(&mut d);
+        fly.update();
     }
-    println!("There are {} output neurons", output.len());
 
     let mut writer_propagated = csv::Writer::from_path("out_data/propagated.csv")?;
     writer_propagated.write_record(&["pre_root_id", "post_root_id", "activity"])?;
@@ -96,19 +113,16 @@ fn main() -> Result<()> {
     writer_learnt.flush()?;
     println!("Saved learnt neurons");
 
-    // let (mut rl, thread) = raylib::init()
-    //     .size(600, 600)
-    //     .title("meow")
-    //     .build();
-
-    // let mut fly = Fly::new(300.0, 300.0);
-    // while !rl.window_should_close() {
-    //     let mut d = rl.begin_drawing(&thread);
-    //     d.clear_background(Color::BLACK);
-        
-    //     fly.draw(&mut d);
-    //     fly.update();
-    // }
+    let output = brain.get_output();
+    let mut writer_output = csv::Writer::from_path("out_data/output_neurons.csv")?;
+    writer_output.write_record(&["neuron_id", "activity"])?;
+    for (neuron_id, activity) in &output {
+        println!("Neuron ID: {neuron_id} Activity: {activity}");
+        writer_output.write_record(&[neuron_id.to_string(), activity.to_string()])?;
+    }
+    writer_output.flush()?;
+    println!("There are {} output neurons", output.len());
+    println!("Saved output neurons");
 
     Ok(())
 }

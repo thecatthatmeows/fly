@@ -94,6 +94,14 @@ impl Brain {
                 .entry(conn.data.post_root_id)
                 .or_insert(Neuron::new(conn.data.post_root_id));
         }
+
+        // Ensure all declared input neurons exist
+        for neuron_id in &neuron_input_ids {
+            neurons
+                .entry(*neuron_id)
+                .or_insert(Neuron::new(*neuron_id));
+        }
+
         println!("Neuron nodes initialized: {}", neurons.len());
         println!("Wrapping neurons...");
 
@@ -213,6 +221,7 @@ impl Brain {
         if let Some(conns) = self.coupling.get(&neuron_id) {
             let pre_activity = self.neurons.get(&neuron_id).unwrap().lock().unwrap().activity;
             for conn in conns {
+                // WARNING: There might be a missing post neuron, dont blame me aight?
                 // do something with an individual neuron
                 let post_neuron = self.neurons.get(&conn.data.post_root_id).unwrap().lock().unwrap();
                 let signal = pre_activity * conn.state.weight * conn.nt_sign();
@@ -236,14 +245,28 @@ impl Brain {
             .filter(|id| {
                 match self.coupling.get(id) {
                     Some(conns) => {
-                        !conns
+                        conns
                             .iter()
-                            .any(|conn| root_ids.contains(&conn.data.post_root_id))
+                            .any(|conn| {
+                                if let Some(conns) = self.coupling.get(&conn.data.post_root_id) {
+                                    !conns.iter().any(|conn| {
+                                        root_ids.contains(&conn.data.post_root_id)
+                                    })
+                                } else {
+                                    true
+                                }
+                            })
                     }
                     None => true
                 }
             })
             .collect();
+
+        for root_id in root_ids {
+            // fires
+            let outputs = self.hop_propagate(root_id);
+            affecteds.extend(outputs);
+        }
 
         let mut inputs = HashMap::new();
         for (_, post_root_id, activity) in &affecteds {
@@ -253,12 +276,6 @@ impl Brain {
         for (post_root_id, activity) in inputs {
             let mut post_neuron = self.neurons.get(&post_root_id).unwrap().lock().unwrap();
             post_neuron.activity = (activity * self.activity_keep).clamp(-1.0, 1.0);
-        }
-
-        for root_id in root_ids {
-            // fires
-            let outputs = self.hop_propagate(root_id);
-            affecteds.extend(outputs);
         }
 
         println!("\nPropagation complete. Total affected connections: {}", affecteds.len());
@@ -314,7 +331,7 @@ impl Brain {
                 ));
             }
         }
-        println!("\nLearning complete. Total affected connections: {}", affecteds.len());
+        println!("\nLearning complete. Total affected neurons: {}", affecteds.len());
 
         affecteds
     }

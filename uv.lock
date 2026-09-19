@@ -788,6 +788,7 @@ name = "fly"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "caveclient" },
     { name = "fafbseg" },
     { name = "matplotlib" },
     { name = "networkx" },
@@ -797,6 +798,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "caveclient", specifier = ">=8.2.1" },
     { name = "fafbseg", specifier = ">=3.2.2" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "networkx", specifier = ">=3.6.1" },
