@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::io;
+use std::{fs, io};
 use std::{collections::HashMap, io::Write};
 use std::sync::Mutex;
 use csv::Result;
@@ -7,6 +7,7 @@ use rand::random_range;
 use rayon::iter::IntoParallelRefIterator;
 use crate::connection::{Connection, Connections};
 
+#[derive(serde::Deserialize)]
 struct Neuron {
     /// Uhh identifier?
     root_id: i64,
@@ -14,11 +15,13 @@ struct Neuron {
     /// How likely it is to fire
     activity: f32,
 
+    #[serde(default)]
     /// Activity threshold
     activity_threshold: f32,
 
     // Activity threshold baseline
     // activity_threshold_base: f32,
+    cell_class: String,
 }
 
 impl Neuron {
@@ -27,6 +30,7 @@ impl Neuron {
             root_id,
             activity: 0.0,
             activity_threshold: 0.001,
+            cell_class: String::new(),
             // activity_threshold_base: 0.5,
         }
     }
@@ -334,5 +338,26 @@ impl Brain {
         println!("\nLearning complete. Total affected neurons: {}", affecteds.len());
 
         affecteds
+    }
+
+    fn get_neurons_by_class(&self, cell_class: &str) -> Result<Vec<Neuron>> {
+        let mut res_neurons = Vec::new();
+
+        let mut csv_reader = 
+            csv::Reader::from_path("out_data/output_neurons_classified.csv")?;
+
+        let mut neurons = Vec::new();
+        for res in csv_reader.deserialize() {
+            let neuron: Neuron = res?;
+            neurons.push(neuron);
+        }
+
+        for neuron in neurons {
+            if neuron.cell_class == cell_class {
+                res_neurons.push(neuron);
+            }
+        }
+
+        Ok(res_neurons)
     }
 }

@@ -1,13 +1,19 @@
-use std::{fs::File, io::{self, BufRead, BufReader, Write}, sync::atomic::{AtomicUsize, Ordering}};
+use std::{fs::File, io::{self, BufRead, BufReader, Write}, process::Command, sync::atomic::{AtomicUsize, Ordering}};
 
-use crate::{brain::Brain, connection::{Connection, Connections}, fly::Fly};
+use crate::{brain::Brain, connection::{Connection, Connections}, fly::Fly, fruit::Fruit};
 use csv::Result;
+use rand::random_range;
 use raylib::prelude::*;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 mod connection;
 mod brain;
 mod fly;
+mod fruit;
+mod spatial;
+
+const SCREEN_WIDTH: f32 = 600.0; 
+const SCREEN_HEIGHT: f32 = 600.0; 
 
 fn _get_neuron_with_least_connections(conns: &[Connection], brain: &Brain) {
     // find the one with the least connections
@@ -69,7 +75,7 @@ fn main() -> Result<()> {
     )?; 
 
     let limit = 0;
-    let epochs = 10;
+    let epochs = 1;
 
     let mut propagated_neurons = Vec::new();
     let mut learnt_neurons = Vec::new();
@@ -82,12 +88,23 @@ fn main() -> Result<()> {
         propagated_neurons = brain.propagate(&starting_neuron_ids, limit);
         learnt_neurons = brain.learn(&starting_neuron_ids, limit);
     }
+    let output = brain.get_output();
 
     let (mut rl, thread) = raylib::init()
-        .size(600, 600)
+        .size(SCREEN_WIDTH as i32, SCREEN_HEIGHT as i32)
         .title("Fruit fly testing")
         .build();
 
+    let mut fruits = Vec::new();
+    for _ in 0..20 {
+        let fruit = Fruit::new(
+            Vector2::new(
+                random_range(0.0..SCREEN_WIDTH),
+                random_range(0.0..SCREEN_HEIGHT)
+            )
+        );
+        fruits.push(fruit);
+    }
     let mut fly = Fly::new(300.0, 300.0);
     while !rl.window_should_close() {
         let mut d = rl.begin_drawing(&thread);
@@ -95,6 +112,11 @@ fn main() -> Result<()> {
         
         fly.draw(&mut d);
         fly.update();
+
+        for fruit in &mut fruits {
+            fruit.draw(&mut d);
+            fruit.update();
+        }
     }
 
     let mut writer_propagated = csv::Writer::from_path("out_data/propagated.csv")?;
@@ -113,7 +135,6 @@ fn main() -> Result<()> {
     writer_learnt.flush()?;
     println!("Saved learnt neurons");
 
-    let output = brain.get_output();
     let mut writer_output = csv::Writer::from_path("out_data/output_neurons.csv")?;
     writer_output.write_record(&["neuron_id", "activity"])?;
     for (neuron_id, activity) in &output {
@@ -121,6 +142,10 @@ fn main() -> Result<()> {
         writer_output.write_record(&[neuron_id.to_string(), activity.to_string()])?;
     }
     writer_output.flush()?;
+    let _status = Command::new("python")
+        .arg("tools/ids_classes.py")
+        .status()?;
+
     println!("There are {} output neurons", output.len());
     println!("Saved output neurons");
 
